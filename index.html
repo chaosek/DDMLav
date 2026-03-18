@@ -145,10 +145,15 @@ canvas{display:block;width:100%;height:100%;}
     🟣 Úzká +3b &nbsp;🟠 Střední +2b &nbsp;🔵 Široká +1b
   </div>
   <button id="startBtn">▶ START</button>
-  <div style="margin-bottom:12px;">
-    <div style="font-size:9px;letter-spacing:3px;color:rgba(80,140,255,.4);margin-bottom:6px;">FOTO Z ALBA</div>
-    <img id="testPhoto" style="width:200px;height:130px;object-fit:cover;border-radius:8px;border:2px solid rgba(255,255,255,.15);display:block;background:#1a2a4a;" crossorigin="anonymous">
-    <div id="testPhotoStatus" style="font-size:9px;color:rgba(255,255,255,.3);margin-top:4px;text-align:center;"></div>
+
+  <div style="margin-bottom:16px;width:100%;max-width:340px;">
+    <div style="font-size:9px;letter-spacing:3px;color:rgba(80,140,255,.4);margin-bottom:8px;">📸 FOTKY NA BILLBOARDY (volitelné)</div>
+    <label style="display:block;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.2);border-radius:10px;padding:12px;text-align:center;cursor:pointer;font-size:12px;color:rgba(255,255,255,.5);">
+      Vyber fotky z alba 🖼
+      <input id="photoInput" type="file" accept="image/*" multiple style="display:none">
+    </label>
+    <div id="photoStatus" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:6px;text-align:center;"></div>
+    <div id="photoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:center;"></div>
   </div>
   <div class="lbtitle">🏆 Nejlepší výsledky</div>
   <div id="lbList"></div>
@@ -192,6 +197,7 @@ function lbRender(id){
 lbRender('lbList');
 
 // ─── PHOTOS ─────────────────────────────────────────────
+// All 28 photo IDs from the album
 const PIDS=[
   'AP1GczPevMxrz84Ha_aI-CCPSXt36H0q7XJXfqtddqAF5eKqBWPBB5GpirnJRjCEGBcGMwuh2G5fUzDuIAeBq5fNsEaNF85gTJIuGXiAW1w6fOfcCkbi9Tk',
   'AP1GczPD4Zc9tCpJd8lKnEDixmDd0que3-z5Q2EO2n1eKsCKIq-Padyw5EwCN4dsbBIHopBKb6ubQoptSCTULFYQWYR6GTb34ig_rGMKlVTxto3ygesw3dA',
@@ -205,22 +211,113 @@ const PIDS=[
   'AP1GczMJJL2uaFxf9VW9CQEXodDrstvfzGuftMvGFvwLM2gqxOScs9o1JsqDedRzPBzPG5G1JFNhRlTTYY2iQJUcRldkbxankQVNXS8ojJwR9lxIkU7JQ7-s',
   'AP1GczNQ-n_cAqxjTqA0QnNDeoahTGTpnWO8S2ipGlEjGf4RyqKEDX-IKR-ufRHAGnDeye6W5fdUetfLiVXmLSitHF5yoGJBvMTOB4af_XFNzkQXI8A3ihPo',
   'AP1GczPseDA-eBg-AT1oKR5Bytg_01BNIhoUMI8nb5xQqN9DaBUVkpYt4hZ316n9okOj3uLmYZsnh7ii2p_hCY9k1VxX4YtVQI5KraCDfYemxeEophzTQ1E',
+  'AP1GczOZjq3bCQaO2ce2oDFAJEdKItl5vtHmGDUr65xPYgaHHFf0ItCEY9f3c6g8YUSTcgXFD03nRl0DYQXQrMGSiNtwsYInqSJgqJJxq2l9Tc0oNOIH5wc',
+  'AP1GczOmMcL33i5G9O7T59tBAaMW9_2mKDV-k2D_69cwsZb_AQhDW7xMzC5zCiG5gsI3XAyZq76M2vn2gvcSyTJZOQirPv91gsJRKx08PeJIczgfIMd_V_Q',
+  'AP1GczOiR8gTeYDwWXPoHBr_wuJl0j2syVaZNZNJOcY-3GdXFYC7iRjUN5Duv722CRRiaenEk_e7XkPfin7NfTi28sf-phG8E5_o4cBwvbfyDLaiKQK_2H8',
+  'AP1GczOxrWfDzcD2RKHpXIWK92lYHMZWCrcBAQDzB8mlZxJaeTILBHzr-D7A1rJdcu8_ZZFN8pA4AO2gkW-e536XzYdSoNrB04ncZxBVdYyW_BsQ0CTkw3w',
+  'AP1GczNUEJN7Sn4j05-1xddMmBdJ7hq3e68nqbfPrbg4cuCI5zbV0FajhREYXEY5gv1s81dBiZbq9f3FTRa2YclgsZsBKmUiGffRprBXhPm5wxWNS4Obv3ph',
+  'AP1GczO0DLPBHFNLDMAf3Txu2l5QTNGOAIr3iTLFi0F45S9ikXRJTF8didQ2D_Zw2YZHpTFbYnJxumj63OBzhFhvLmMAGXn5pzK2drTC6R24KjnFbagiPH4',
+  'AP1GczMDwrvRc-mhqzUABWzoT4LRAon2vEFhMfe1IGD-1yWCRwm0gdxtBVLraw52YcceKZHtP593qlq-nJ3zFAArX7q5Wh2qo_yzYVTpa96JzZ_75XuSaBQ',
+  'AP1GczMv-pxw-icrwPbRDKbV4JDSVgVW4UOJ-1ZWt5aLfInUKVkKFRG_nF4BdXzRIg-AtG3BECHE19UBj-67wcNZ-PxOUQrq3bfeGPVJd98lWzMpjFpwke0',
+  'AP1GczPvsm_wHe7BJXRANpJk_ZPpVV8d45XDgHOhPyVJBNxdpz5fXWFww0LFYGU8FkysjuQbu_AYAm2bHffDLMD0Rn2VX1AaqAhjlwFLrF23IeQHPzGjFOY',
+  'AP1GczP5YBblf894M7FhQltd1EDqNbAKPmrQ6VtX0Fk_PGfoNCsFVmkdshmXsDOLvbLQlM6czAQSwa8fauNrDCIufCJ741i8Drmr7omSnoMbTakoUDRL8GS-',
+  'AP1GczOIJ9YHWX3Q6wLt909zqv3ar2dOXvKQrmdLKVwdADydsyUelvNRvfqhdVmQLALuMmg39hmqDV5UNkfNhz5--n8XaLrE6amBAVvqE-AAXXRiUhTX0YOv',
+  'AP1GczPbY234u69lCOA1oESe5v7pJqcLPwbmIhuKCOcK95Km5x7IWcuJQTX-oYvyswBC1JneYvZeRiNS9XOwW44zsSOKK076pnirBvvStT9dOKR7wL0MAb_e',
+  'AP1GczOTJVtjQ0ZEEDgqgx2AriJK_ShTEWoOy4wo1BxEGexB5rHCEn8V92nXe42YsgIpbtFBz8zJuVGxjg_VJeKqDqcwTZrnDB20CDcNv-8hYTviCZC8FYQ',
+  'AP1GczOgnGEqFDeaiwMfYCi5VDpDZzIu8SJINEc6Ygr6qzqfG-sEIwPy9zZ9XtCaHlYQzsyIaoYaR_DyyBRatOSwqvPy0P8kEgdDF3cfzIMG-3W1_A0k5j4',
+  'AP1GczNqfgEO884OOaaiZrcl32GcCJ93S8mlNsvYnoPcnQ8Snr0D81u5aN4RROdTrI5KD5vV2FOLjDPSLZUmLDs0mOI_51BC3BQtlAyhMxWFQXKATPdSMTY',
+  'AP1GczMcGNzI8kJTY0FzsfA7hxAni_48PB6SW4JxgcB_5SIiM9RgShZqAUOOKB5PoDdZdM9RF-J7dtjBPZumxeagkqyRTuE4TzUqSQQMda1WEJi91UOpNM8',
 ];
-let pidx=0;
-function photoUrl(id){
-  return `https://lh3.googleusercontent.com/pw/${id}=w800-k-no`;
-}
-function nextPurl(){const id=PIDS[pidx%PIDS.length];pidx++;return photoUrl(id);}
 
-// Test photo on menu
+// ─── PHOTO SYSTEM ───────────────────────────────────────
+// Priority: 1) user uploaded files, 2) direct lh3 URLs via Image() without crossOrigin
+let userPhotos = [];
+let lhTexCache = {}; // cache loaded lh3 textures
+let pidx = 0;
+
+// Load lh3 photo as Three.js texture WITHOUT crossOrigin
+// This works because lh3.googleusercontent.com allows hotlinking (no crossOrigin needed)
+// crossOrigin='anonymous' would trigger CORS preflight which fails
+function loadLhTex(pid, mat){
+  if(lhTexCache[pid]){
+    mat.map=lhTexCache[pid];mat.color.setHex(0xffffff);mat.needsUpdate=true;return;
+  }
+  const img=new Image(); // NO crossOrigin attribute — key to making it work
+  img.onload=()=>{
+    const tex=new THREE.Texture(img);
+    tex.needsUpdate=true;
+    lhTexCache[pid]=tex;
+    mat.map=tex;mat.color.setHex(0xffffff);mat.needsUpdate=true;
+  };
+  img.src=`https://lh3.googleusercontent.com/pw/${pid}=w800-k-no`;
+}
+
+function nextPhoto(){
+  // If user uploaded files — use those
+  if(userPhotos.length>0){
+    const url=userPhotos[pidx%userPhotos.length];pidx++;return{type:'dataurl',url};
+  }
+  // Otherwise use lh3 IDs
+  const pid=PIDS[pidx%PIDS.length];pidx++;return{type:'lh3',pid};
+}
+
+// Fallback gradient if nothing loads
+function makeFallbackPhoto(hue){
+  const cv=document.createElement('canvas');cv.width=200;cv.height=120;
+  const c=cv.getContext('2d');
+  const g=c.createLinearGradient(0,0,200,120);
+  g.addColorStop(0,`hsl(${hue},60%,35%)`);g.addColorStop(1,`hsl(${hue+40},70%,55%)`);
+  c.fillStyle=g;c.fillRect(0,0,200,120);
+  c.fillStyle='rgba(255,255,255,.15)';c.font='bold 14px Arial';c.textAlign='center';
+  c.fillText('DDM Lavarone 2026',100,50);c.fillText('🎿',100,80);
+  return cv.toDataURL();
+}
+const FALLBACK_PHOTOS=[200,240,280,320,360,20,60,100,140,180].map(makeFallbackPhoto);
+
+// File input handler
+document.getElementById('photoInput').addEventListener('change', function(){
+  const files=Array.from(this.files);
+  if(!files.length)return;
+  userPhotos=[];pidx=0;
+  const preview=document.getElementById('photoPreview');
+  preview.innerHTML='';
+  document.getElementById('photoStatus').textContent=`Načítám ${files.length} fotek...`;
+  let loaded=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      userPhotos.push(e.target.result);loaded++;
+      const img=document.createElement('img');
+      img.src=e.target.result;
+      img.style.cssText='width:60px;height:40px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,.2)';
+      preview.appendChild(img);
+      if(loaded===files.length){
+        document.getElementById('photoStatus').textContent=`✓ ${loaded} fotek načteno`;
+        document.getElementById('photoStatus').style.color='#22dd88';
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+// Test lh3 photo on menu — show one automatically
 (function(){
   const pid=PIDS[Math.floor(Math.random()*PIDS.length)];
-  const img=document.getElementById('testPhoto');
-  const status=document.getElementById('testPhotoStatus');
-  img.crossOrigin='anonymous';
-  img.onload=()=>{ status.textContent='✓ Foto načteno'; status.style.color='#22dd88'; };
-  img.onerror=()=>{ status.textContent='✗ Nahraj na GitHub Pages pro fotky'; status.style.color='#ff8844'; };
-  img.src=photoUrl(pid);
+  const preview=document.getElementById('photoPreview');
+  const status=document.getElementById('photoStatus');
+  status.textContent='Načítám foto z alba...';
+  const img=new Image(); // NO crossOrigin
+  img.style.cssText='width:100px;height:66px;object-fit:cover;border-radius:6px;border:2px solid rgba(255,255,255,.2)';
+  img.onload=()=>{
+    preview.appendChild(img);
+    status.textContent='✓ Fotky z alba se zobrazují automaticky';
+    status.style.color='#22dd88';
+  };
+  img.onerror=()=>{
+    status.textContent='Nahraj vlastní fotky nebo spusť na HTTPS';
+    status.style.color='rgba(255,255,255,.3)';
+  };
+  img.src=`https://lh3.googleusercontent.com/pw/${pid}=w300-k-no`;
 })();
 
 // ─── AUDIO ──────────────────────────────────────────────
@@ -719,32 +816,21 @@ function makeBB(){
 }
 for(let i=0;i<BB;i++)bbPool.push(makeBB());
 function placeBB(bb,wz){
-  // Alternate left/right, just outside the road
   const side=Math.random()>.5?1:-1;
-  const wx=side*20; // ~20m from centre, outside lane lines
+  const wx=side*20;
   const wy=groundY(wx,wz);
   bb.group.position.set(wx,wy,wz);
-  // Face DOWN the slope toward approaching skier — rotation.y=0 = faces +Z = faces skier
-  bb.group.rotation.y = 0;
+  bb.group.rotation.y=0;
   bb.group.visible=true;
 
-  // Load photo with crossOrigin set
-  const loader=new THREE.TextureLoader();
-  loader.crossOrigin='anonymous';
-  loader.load(nextPurl(),
-    tex=>{
-      tex.encoding=THREE.sRGBEncoding;
-      bb.mat.map=tex;
-      bb.mat.color.setHex(0xffffff);
-      bb.mat.needsUpdate=true;
-    },
-    undefined,
-    ()=>{
-      // On error — show coloured placeholder so billboard isn't invisible
-      bb.mat.color.setHex(0x3366aa);
-      bb.mat.needsUpdate=true;
-    }
-  );
+  const p=nextPhoto();
+  if(p.type==='lh3'){
+    loadLhTex(p.pid, bb.mat);
+  } else {
+    // dataURL from file input — load via TextureLoader (no CORS issue)
+    const tex=new THREE.TextureLoader().load(p.url);
+    bb.mat.map=tex;bb.mat.color.setHex(0xffffff);bb.mat.needsUpdate=true;
+  }
 }
 function updateBBs(pz){
   if(!bbDone){
@@ -1134,8 +1220,7 @@ function startGame(){
     timing:false,legT:0,camOK:false,lastDiff:-1,camLookX:0,
   });
   fpPitch=0;fpYaw=0;fpRoll=0;
-  gNextZ=-25;oNextZ=-65;bbDone=false;bbNextZ=0;pidx=0;
-  terrZ=null;
+  gNextZ=-25;oNextZ=-65;bbDone=false;bbNextZ=0;pidx=0;  terrZ=null;
   tcInit();
   sndStart();
 }
