@@ -147,13 +147,13 @@ canvas{display:block;width:100%;height:100%;}
   <button id="startBtn">▶ START</button>
 
   <div style="margin-bottom:16px;width:100%;max-width:340px;">
-    <div style="font-size:9px;letter-spacing:3px;color:rgba(80,140,255,.4);margin-bottom:8px;">📸 FOTKY NA BILLBOARDY (volitelné)</div>
-    <label style="display:block;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.2);border-radius:10px;padding:12px;text-align:center;cursor:pointer;font-size:12px;color:rgba(255,255,255,.5);">
-      Vyber fotky z alba 🖼
+    <div style="font-size:9px;letter-spacing:3px;color:rgba(80,140,255,.4);margin-bottom:8px;">📸 FOTKY NA BILLBOARDY</div>
+    <div id="photoPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;justify-content:center;min-height:80px;align-items:center;"></div>
+    <label style="display:block;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.2);border-radius:10px;padding:10px;text-align:center;cursor:pointer;font-size:12px;color:rgba(255,255,255,.4);">
+      + Přidat vlastní fotky 🖼
       <input id="photoInput" type="file" accept="image/*" multiple style="display:none">
     </label>
     <div id="photoStatus" style="font-size:10px;color:rgba(255,255,255,.3);margin-top:6px;text-align:center;"></div>
-    <div id="photoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:center;"></div>
   </div>
   <div class="lbtitle">🏆 Nejlepší výsledky</div>
   <div id="lbList"></div>
@@ -307,7 +307,7 @@ document.getElementById('photoInput').addEventListener('change', function(){
   const status=document.getElementById('photoStatus');
   status.textContent='Načítám foto z alba...';
   const img=new Image(); // NO crossOrigin
-  img.style.cssText='width:100px;height:66px;object-fit:cover;border-radius:6px;border:2px solid rgba(255,255,255,.2)';
+  img.style.cssText='width:300px;height:200px;object-fit:cover;border-radius:10px;border:2px solid rgba(255,255,255,.25);display:block;';
   img.onload=()=>{
     preview.appendChild(img);
     status.textContent='✓ Fotky z alba se zobrazují automaticky';
@@ -948,38 +948,28 @@ window.addEventListener('keyup',  e=>keys[e.key]=false);
 
 let fpPitch=0, fpYaw=0, fpRoll=0; // smooth camera angles
 
+// Camera — 3rd person, elevated behind skier, looking down at slope
+// This way gates are clearly visible ahead
+let camX=0,camY=0,camZ=0,camOK=false,camLookX=0;
+
 function camTick(dt){
-  // Head position: skier world pos + 1.75m up
-  camera.position.set(G.x, G.y+1.75, G.z);
+  // Position: 16m behind, 18m above ground
+  const ty = groundY(G.x, G.z+16) + 18;
+  const tx = G.x, tz = G.z+16;
+  if(!camOK){camX=tx;camY=ty;camZ=tz;camOK=true;}
+  camX += (tx-camX)*Math.min(1,dt*9);
+  camY += (ty-camY)*Math.min(1,dt*5);
+  camZ += (tz-camZ)*Math.min(1,dt*8);
+  camera.position.set(camX,camY,camZ);
 
-  // ── Pitch: follow slope angle ──────────────────────────
-  const hNow  = groundY(G.x, G.z);
-  const hAhead= groundY(G.x, G.z-4);
-  const slopePitch = Math.atan2(hNow-hAhead, 4); // positive = going downhill
-  const targetPitch = -0.08 - slopePitch*0.5;    // tilt forward down slope
-  fpPitch += (targetPitch - fpPitch) * Math.min(1, dt*6);
-
-  // ── Yaw: look toward next gate — VERY subtle ──────────
-  const ng = activeGates.find(g=>!g.passed);
-  let targetYaw = 0;
-  if(ng && ng.z-G.z > -160 && ng.z < G.z+2){
-    const dx = ng.x - G.x;
-    const dz = Math.abs(ng.z - G.z) + 0.01;
-    // Max ±12° look-ahead so player knows where to go
-    targetYaw = Math.max(-0.20, Math.min(0.20, Math.atan2(dx, dz) * 0.35));
+  // Look slightly ahead — gently toward next gate
+  const ng=activeGates.find(g=>!g.passed);
+  let tlx=G.x;
+  if(ng && ng.z-G.z>-120 && ng.z<G.z+2){
+    tlx=G.x+(ng.x-G.x)*0.35;
   }
-  fpYaw += (targetYaw - fpYaw) * Math.min(1, dt*5);
-
-  // ── Roll: lean into turns like a real skier ────────────
-  const targetRoll = -G.steer * 0.06; // slight tilt into turn
-  fpRoll += (targetRoll - fpRoll) * Math.min(1, dt*8);
-
-  // ── Compose rotation: YXZ order (yaw, pitch, roll) ────
-  // This avoids gimbal lock and feels natural for a first-person skier
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = fpYaw;
-  camera.rotation.x = fpPitch;
-  camera.rotation.z = fpRoll;
+  camLookX+=(tlx-camLookX)*Math.min(1,dt*7);
+  camera.lookAt(camLookX, G.y, G.z-12);
 }
 
 // Hide skier body in first person
@@ -1220,7 +1210,7 @@ function startGame(){
     timing:false,legT:0,camOK:false,lastDiff:-1,camLookX:0,
   });
   fpPitch=0;fpYaw=0;fpRoll=0;
-  gNextZ=-25;oNextZ=-65;bbDone=false;bbNextZ=0;pidx=0;  terrZ=null;
+  gNextZ=-25;oNextZ=-65;bbDone=false;bbNextZ=0;pidx=0;terrZ=null;camOK=false;camLookX=0;
   tcInit();
   sndStart();
 }
