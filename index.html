@@ -593,17 +593,15 @@ function buildGate(wz,diff){
   const cat=gateCat(diff);
   const col=gateCol(cat,activeGates.length);
 
-  const mat=new THREE.MeshStandardMaterial({
-    color:col,roughness:.38,metalness:.2,
-    emissive:new THREE.Color(col),emissiveIntensity:.3,
-    side:THREE.DoubleSide
-  });
-  const poleMat=new THREE.MeshStandardMaterial({color:col,roughness:.5,emissive:new THREE.Color(col),emissiveIntensity:.15});
+  const poleMat=new THREE.MeshStandardMaterial({color:col,roughness:.5,
+    emissive:new THREE.Color(col),emissiveIntensity:.2});
 
-  const lx=gx-cat.half,rx=gx+cat.half;
-  const ly=groundY(lx,wz),ry=groundY(rx,wz);
+  const lx=gx-cat.half, rx=gx+cat.half;
+  const ly=groundY(lx,wz), ry=groundY(rx,wz);
   const baseY=(ly+ry)*.5;
   const POLE_H=4.8;
+  const W=cat.half*2; // photo width = gate width
+  const H=W*0.62;     // photo height (landscape ratio)
   const meshes=[];
 
   // Ground poles
@@ -611,29 +609,53 @@ function buildGate(wz,diff){
     const ph=POLE_H+.5;
     const p=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,ph,8),poleMat);
     p.position.set(px,gy+ph*.5,wz);p.castShadow=true;scene.add(p);meshes.push(p);
-    // Ground disc
-    const d=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.1,12),
+    const d=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.1,10),
       new THREE.MeshLambertMaterial({color:0xaabbcc}));
     d.position.set(px,gy+.05,wz);scene.add(d);meshes.push(d);
   }
 
-  // Semicircle arch as TubeGeometry along a CatmullRomCurve3
-  const pts=[];
-  const SEGS=20;
-  for(let i=0;i<=SEGS;i++){
-    const a=Math.PI*i/SEGS; // 0..PI
-    pts.push(new THREE.Vector3(
-      gx + Math.cos(Math.PI-a)*cat.half,
-      baseY + POLE_H + Math.sin(a)*cat.half,
-      wz
-    ));
-  }
-  const curve=new THREE.CatmullRomCurve3(pts);
-  const archGeo=new THREE.TubeGeometry(curve,32,.28,8,false);
-  const arch=new THREE.Mesh(archGeo,mat);
-  arch.castShadow=true;scene.add(arch);meshes.push(arch);
+  // Top horizontal bar connecting poles
+  const barMat=new THREE.MeshStandardMaterial({color:col,roughness:.4,
+    emissive:new THREE.Color(col),emissiveIntensity:.25});
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,W+.3,8),barMat);
+  bar.rotation.z=Math.PI/2;
+  bar.position.set(gx, baseY+POLE_H+H+.15, wz);
+  scene.add(bar);meshes.push(bar);
 
-  activeGates.push({z:wz,x:gx,half:cat.half,pts:cat.pts,passed:false,meshes,mat,col});
+  // Photo plane — MeshBasicMaterial, always fully bright
+  const photoMat=new THREE.MeshBasicMaterial({
+    color:0x888888, // grey until photo loads
+    side:THREE.DoubleSide,
+    transparent:false,
+  });
+  const photoPlane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), photoMat);
+  photoPlane.position.set(gx, baseY+POLE_H+H*.5, wz);
+  scene.add(photoPlane);meshes.push(photoPlane);
+
+  // Coloured frame border (thin box behind photo)
+  const frameMat=new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide});
+  const frame=new THREE.Mesh(new THREE.PlaneGeometry(W+.4,H+.3),frameMat);
+  frame.position.set(gx, baseY+POLE_H+H*.5, wz-.05);
+  scene.add(frame);meshes.push(frame);
+
+  // Load photo WITHOUT crossOrigin — same trick that works in the photo app
+  const photo=nextPhoto();
+  if(photo.type==='lh3'){
+    const img=new Image();
+    img.onload=()=>{
+      const tex=new THREE.Texture(img);
+      tex.needsUpdate=true;
+      photoMat.map=tex;
+      photoMat.color.setHex(0xffffff);
+      photoMat.needsUpdate=true;
+    };
+    img.src=`https://lh3.googleusercontent.com/pw/${photo.pid}=w800-k-no`;
+  } else {
+    const tex=new THREE.TextureLoader().load(photo.url);
+    photoMat.map=tex;photoMat.color.setHex(0xffffff);photoMat.needsUpdate=true;
+  }
+
+  activeGates.push({z:wz,x:gx,half:cat.half,pts:cat.pts,passed:false,meshes,mat:photoMat,col});
 }
 function removeGate(g){g.meshes.forEach(m=>{if(m.geometry)m.geometry.dispose();scene.remove(m);});}
 
@@ -792,53 +814,9 @@ function removeObst(ob){
 }
 
 // ─── BILLBOARDS ─────────────────────────────────────────
-const BB=6,bbPool=[];
-let bbDone=false,bbNextZ=0;
-function makeBB(){
-  const g=new THREE.Group();
-  const pm=new THREE.MeshLambertMaterial({color:0x222222});
-  for(const ox of[-3.5,3.5]){
-    const p=new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,9.5,8),pm);
-    p.position.set(ox,4.75,0);g.add(p);
-  }
-  // White frame
-  const f=new THREE.Mesh(new THREE.BoxGeometry(8.5,5.2,.18),new THREE.MeshLambertMaterial({color:0xffffff}));
-  f.position.y=10.8;g.add(f);
-  // Photo (MeshBasicMaterial — always fully visible)
-  const ph=new THREE.Mesh(new THREE.PlaneGeometry(8.0,4.8),
-    new THREE.MeshBasicMaterial({color:0xdddddd,side:THREE.DoubleSide}));
-  ph.position.set(0,10.8,.1);g.add(ph);
-  // Red stripe
-  const s=new THREE.Mesh(new THREE.BoxGeometry(8.5,.55,.14),new THREE.MeshLambertMaterial({color:0xbb1100}));
-  s.position.y=8.15;g.add(s);
-  g.visible=false;scene.add(g);
-  return{group:g,ph,mat:ph.material};
-}
-for(let i=0;i<BB;i++)bbPool.push(makeBB());
-function placeBB(bb,wz){
-  const side=Math.random()>.5?1:-1;
-  const wx=side*20;
-  const wy=groundY(wx,wz);
-  bb.group.position.set(wx,wy,wz);
-  bb.group.rotation.y=0;
-  bb.group.visible=true;
+// Billboards removed — photos are now displayed as gate panels
 
-  const p=nextPhoto();
-  if(p.type==='lh3'){
-    loadLhTex(p.pid, bb.mat);
-  } else {
-    // dataURL from file input — load via TextureLoader (no CORS issue)
-    const tex=new THREE.TextureLoader().load(p.url);
-    bb.mat.map=tex;bb.mat.color.setHex(0xffffff);bb.mat.needsUpdate=true;
-  }
-}
-function updateBBs(pz){
-  if(!bbDone){
-    for(let i=0;i<BB;i++)placeBB(bbPool[i],pz-100-i*160);
-    bbNextZ=pz-100-BB*160;bbDone=true;return;
-  }
-  for(const bb of bbPool)if(bb.group.position.z>pz+70){bbNextZ-=150+Math.random()*120;placeBB(bb,bbNextZ);}
-}
+
 
 // ─── SKIER ──────────────────────────────────────────────
 // Beautiful detailed skier in 3rd person
@@ -1104,9 +1082,6 @@ function tick(dt){
   // World
   updateTerrain(G.z);
   updateSnow(G.z,dt);
-  // Trees left side only
-  // (re-use existing tree pool from previous version — skip here for clean rewrite)
-  updateBBs(G.z);
 
   // Spawn gates
   while(gNextZ>G.z-220){gNextZ-=gateSpacing();buildGate(gNextZ,G.diff);}
@@ -1210,7 +1185,7 @@ function startGame(){
     timing:false,legT:0,camOK:false,lastDiff:-1,camLookX:0,
   });
   fpPitch=0;fpYaw=0;fpRoll=0;
-  gNextZ=-25;oNextZ=-65;bbDone=false;bbNextZ=0;pidx=0;terrZ=null;camOK=false;camLookX=0;
+  gNextZ=-25;oNextZ=-65;pidx=0;terrZ=null;camOK=false;camLookX=0;
   tcInit();
   sndStart();
 }
